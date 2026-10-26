@@ -10,4 +10,4 @@ WORKDIR /app
 COPY --from=build /app/StockMarketWebServer.jar .
 COPY web/ ./web/
 EXPOSE 8080
-CMD ["java", "-jar", "StockMarketWebServer.jar", "8080"]
+CMD ["sh", "-c", "java -jar StockMarketWebServer.jar ${PORT:-8080}"]
