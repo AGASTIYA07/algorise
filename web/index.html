@@ -1,0 +1,1641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Algorise — Real-Time Stock Market Tracker</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brandDark: '#09090b',
+            surfaceDark: '#121215',
+            cardDark: '#18181b',
+            borderDark: '#27272a',
+            accentJade: '#00dc82',
+            bullGreen: '#10b981',
+            bearRed: '#f43f5e',
+            accentGold: '#f59e0b',
+            brandEmerald: '#00dc82'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #09090b;
+      color: #fafafa;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
+    }
+    .scrollbar-thin::-webkit-scrollbar { width: 5px; height: 5px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: #09090b; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; }
+    .tab-active {
+      color: #00dc82;
+      border-bottom: 2px solid #00dc82;
+      background: rgba(0, 220, 130, 0.06);
+    }
+    .glow-emerald { box-shadow: 0 0 15px rgba(0, 220, 130, 0.25); }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col scrollbar-thin">
+
+  <!-- ===================================================================== -->
+  <!-- INSTITUTIONAL NAVBAR                                                  -->
+  <!-- ===================================================================== -->
+  <header class="border-b border-borderDark bg-surfaceDark/90 backdrop-blur sticky top-0 z-50 px-4 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-4">
+    <!-- Brand -->
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+        <i class="fa-solid fa-chart-pie text-base"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="font-extrabold text-lg text-white tracking-tight">Algo<span class="text-[#00dc82]">rise</span></span>
+          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            Markets Live
+          </span>
+        </div>
+        <p class="text-[11px] text-slate-400">Real-Time Portfolio Intelligence &amp; Range Analytics</p>
+      </div>
+    </div>
+
+    <!-- Live Portfolio Ticker Summary -->
+    <div class="hidden md:flex items-center gap-6 px-4 py-1.5 rounded-xl bg-cardDark/80 border border-borderDark text-xs font-mono">
+      <div>
+        <div class="text-[10px] text-slate-400 uppercase tracking-wider">Net Portfolio Value</div>
+        <div id="nav-net-worth" class="font-bold text-white text-sm">$84,520.40</div>
+      </div>
+      <div class="border-l border-borderDark pl-4">
+        <div class="text-[10px] text-slate-400 uppercase tracking-wider">Today's P&amp;L</div>
+        <div id="nav-day-pnl" class="font-bold text-bullGreen text-sm">+$1,280.50 (+1.54%)</div>
+      </div>
+      <div class="border-l border-borderDark pl-4">
+        <div class="text-[10px] text-slate-400 uppercase tracking-wider">Buying Power (Cash)</div>
+        <div id="nav-cash" class="font-bold text-[#00dc82] text-sm">$28,450.00</div>
+      </div>
+    </div>
+
+    <!-- Navigation & Quick Action -->
+    <div class="flex items-center gap-3">
+      <button onclick="openTradeModal('BUY', 'AAPL')" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition shadow-lg shadow-emerald-600/20 flex items-center gap-2">
+        <i class="fa-solid fa-plus text-[10px]"></i> Quick Trade
+      </button>
+    </div>
+  </header>
+
+  <!-- Navigation Tab Bar -->
+  <nav class="border-b border-borderDark bg-surfaceDark px-4 lg:px-8 flex overflow-x-auto gap-2 scrollbar-thin text-xs font-medium">
+    <button onclick="switchTab('tab-portfolio')" id="btn-tab-portfolio" class="px-4 py-3 tab-active flex items-center gap-2 transition whitespace-nowrap">
+      <i class="fa-solid fa-briefcase"></i> My Portfolio &amp; Holdings
+    </button>
+    <button onclick="switchTab('tab-analytics')" id="btn-tab-analytics" class="px-4 py-3 text-slate-400 hover:text-white flex items-center gap-2 transition whitespace-nowrap">
+      <i class="fa-solid fa-chart-line text-[#00dc82]"></i> Range Analytics &amp; Screener
+    </button>
+    <button onclick="switchTab('tab-market')" id="btn-tab-market" class="px-4 py-3 text-slate-400 hover:text-white flex items-center gap-2 transition whitespace-nowrap">
+      <i class="fa-solid fa-trophy text-amber-400"></i> Market Leaderboard
+    </button>
+    <button onclick="switchTab('tab-orders')" id="btn-tab-orders" class="px-4 py-3 text-slate-400 hover:text-white flex items-center gap-2 transition whitespace-nowrap">
+      <i class="fa-solid fa-clock-rotate-left text-purple-400"></i> Order Book &amp; Undo
+    </button>
+    <button onclick="switchTab('tab-alerts')" id="btn-tab-alerts" class="px-4 py-3 text-slate-400 hover:text-white flex items-center gap-2 transition whitespace-nowrap">
+      <i class="fa-solid fa-bell text-rose-400"></i> Price Targets &amp; Alerts
+    </button>
+    <button onclick="switchTab('tab-activity')" id="btn-tab-activity" class="px-4 py-3 text-slate-400 hover:text-white flex items-center gap-2 transition whitespace-nowrap">
+      <i class="fa-solid fa-receipt text-slate-400"></i> Trade Statement
+    </button>
+  </nav>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+  <!-- ===================================================================== -->
+  <!-- MAIN CONTENT CONTAINER                                                -->
+  <!-- ===================================================================== -->
+  <main class="flex-1 p-4 lg:p-8 max-w-[1700px] w-full mx-auto">
+
+    <!-- ───────────────────────────────────────────────────────────────── -->
+    <!-- TAB 1: MY PORTFOLIO & HOLDINGS                                    -->
+    <!-- ───────────────────────────────────────────────────────────────── -->
+    <div id="tab-portfolio" class="space-y-6">
+      
+      <!-- Top Overview Metrics -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-cardDark border border-borderDark rounded-2xl p-5 shadow-lg">
+          <div class="text-xs text-slate-400 font-medium mb-1 flex items-center justify-between">
+            <span>Portfolio Value</span>
+            <i class="fa-solid fa-vault text-emerald-400"></i>
+          </div>
+          <div id="summary-total-val" class="text-2xl lg:text-3xl font-extrabold text-white font-mono">$84,520.40</div>
+          <div class="flex items-center gap-1.5 mt-2 text-xs text-bullGreen font-semibold font-mono">
+            <i class="fa-solid fa-arrow-trend-up"></i>
+            <span id="summary-total-pnl">+$13,320.40 (+18.7%)</span>
+            <span class="text-slate-500 font-normal">All Time</span>
+          </div>
+        </div>
+
+        <div class="bg-cardDark border border-borderDark rounded-2xl p-5 shadow-lg">
+          <div class="text-xs text-slate-400 font-medium mb-1 flex items-center justify-between">
+            <span>Available Buying Power</span>
+            <i class="fa-solid fa-wallet text-emerald-400"></i>
+          </div>
+          <div id="summary-cash" class="text-2xl lg:text-3xl font-extrabold text-white font-mono">$28,450.00</div>
+          <div class="text-xs text-slate-400 mt-2">Simulated Cash Available for Trades</div>
+        </div>
+
+        <div class="bg-cardDark border border-borderDark rounded-2xl p-5 shadow-lg">
+          <div class="text-xs text-slate-400 font-medium mb-1 flex items-center justify-between">
+            <span>Active Asset Positions</span>
+            <i class="fa-solid fa-layer-group text-purple-400"></i>
+          </div>
+          <div id="summary-positions-count" class="text-2xl lg:text-3xl font-extrabold text-white font-mono">6 Stocks</div>
+          <div class="text-xs text-slate-400 mt-2">Diversified across Tech, AI, Cloud &amp; Auto</div>
+        </div>
+
+        <div class="bg-cardDark border border-borderDark rounded-2xl p-5 shadow-lg">
+          <div class="text-xs text-slate-400 font-medium mb-1 flex items-center justify-between">
+            <span>Pending Orders</span>
+            <i class="fa-solid fa-clock text-amber-400"></i>
+          </div>
+          <div id="summary-pending-count" class="text-2xl lg:text-3xl font-extrabold text-white font-mono">1 Order</div>
+          <div class="text-xs text-slate-400 mt-2">Waiting in Order Book</div>
+        </div>
+      </div>
+
+      <!-- Holdings Table -->
+      <div class="bg-cardDark border border-borderDark rounded-2xl p-5 shadow-lg">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+          <div>
+            <h2 class="text-base font-bold text-white">Current Portfolio Holdings</h2>
+            <p class="text-xs text-slate-400">Live positions, cost basis, market valuation, and performance</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-400 font-mono">Simulate Market Day:</span>
+            <button onclick="advanceMarketDay()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-forward-step"></i> Next Trading Session
+            </button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead class="text-slate-400 uppercase text-[10px] border-b border-borderDark">
+              <tr>
+                <th class="py-3 px-3">Asset</th>
+                <th class="py-3 px-3">Shares</th>
+                <th class="py-3 px-3 text-right">Avg Buy Price</th>
+                <th class="py-3 px-3 text-right">Market Price</th>
+                <th class="py-3 px-3 text-right">Current Value</th>
+                <th class="py-3 px-3 text-right">Unrealized P&amp;L</th>
+                <th class="py-3 px-3 text-right">Daily Change</th>
+                <th class="py-3 px-3 text-center">Trade Actions</th>
+              </tr>
+            </thead>
+            <tbody id="holdings-tbody" class="divide-y divide-borderDark/60 font-mono">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ───────────────────────────────────────────────────────────────── -->
+    <!-- TAB 2: 30-DAY RANGE ANALYTICS & SCREENER (SEGMENT TREE CORE)       -->
+    <!-- ───────────────────────────────────────────────────────────────── -->
+    <div id="tab-analytics" class="hidden space-y-6">
+
+      <!-- Screener Banner: "Which Stock Performed Best in Last 30 Days?" -->
+      <div class="bg-gradient-to-r from-emerald-950/40 via-[#141417] to-zinc-900 border border-emerald-500/30 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div>
+            <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 mb-2">
+              <i class="fa-solid fa-bolt text-amber-400"></i> Real-Time Range Screener
+            </div>
+            <h2 class="text-xl font-extrabold text-white tracking-tight">Stock Performance Comparison</h2>
+          </div>
+
+          <!-- Time Window Preset Switcher -->
+          <div class="flex items-center gap-1.5 bg-zinc-900 border border-borderDark p-1.5 rounded-xl text-xs font-medium">
+            <button onclick="setLookbackDays(7)" id="btn-window-7" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">7 Days</button>
+            <button onclick="setLookbackDays(14)" id="btn-window-14" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">14 Days</button>
+            <button onclick="setLookbackDays(30)" id="btn-window-30" class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold transition">30 Days</button>
+            <button onclick="setLookbackDays(60)" id="btn-window-60" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">All-Time</button>
+          </div>
+        </div>
+
+        <!-- Comparative Ranking Cards (Top Performer Spotlight) -->
+        <div id="comparative-rankings-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Deep Dive Interactive Chart & Custom Range Inspector -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Chart View (8 Cols) -->
+        <div class="lg:col-span-8 bg-cardDark border border-borderDark rounded-2xl p-5 shadow-lg flex flex-col">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div class="flex items-center gap-3">
+              <select id="analytics-stock-select" onchange="onAnalyticsStockChange()" class="bg-surfaceDark border border-borderDark text-white font-bold text-sm rounded-xl px-3 py-1.5 focus:outline-none focus:border-emerald-500 font-mono">
+                <option value="AAPL">AAPL — Apple Inc.</option>
+                <option value="NVDA">NVDA — NVIDIA Corp.</option>
+                <option value="TSLA">TSLA — Tesla Inc.</option>
+                <option value="MSFT">MSFT — Microsoft Corp.</option>
+                <option value="GOOGL">GOOGL — Alphabet Inc.</option>
+                <option value="AMZN">AMZN — Amazon.com Inc.</option>
+                <option value="META">META — Meta Platforms Inc.</option>
+                <option value="NFLX">NFLX — Netflix Inc.</option>
+                <option value="AMD">AMD — Advanced Micro Devices Inc.</option>
+                <option value="JPM">JPM — JPMorgan Chase &amp; Co.</option>
+              </select>
+              <span id="chart-tag-price" class="text-xl font-bold font-mono text-white">$192.50</span>
+              <span id="chart-tag-pct" class="text-xs font-semibold px-2 py-0.5 rounded font-mono bg-emerald-500/10 text-emerald-400">+1.24%</span>
+            </div>
+            <div class="text-xs text-slate-400 font-mono">
+              Total History: <span id="chart-total-days" class="text-white font-bold">35</span> Trading Days
+            </div>
+          </div>
+
+          <div class="relative h-72 w-full">
+            <canvas id="deepChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Custom Range Inspector Card (4 Cols) -->
+        <div class="lg:col-span-4 bg-cardDark border border-borderDark rounded-2xl p-5 shadow-lg flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-bold text-sm text-white">Custom Range Analytics</h3>
+              <span class="text-[10px] text-emerald-400 font-medium px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20">Real-Time Aggregation</span>
+            </div>
+            <p class="text-xs text-slate-400 mb-4">Calculate exact low, high, average price, and net return between any two dates.</p>
+
+            <div class="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">From Day:</label>
+                <input type="number" id="custom-l" value="5" min="1" max="35" class="w-full bg-surfaceDark border border-borderDark rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-emerald-500">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">To Day:</label>
+                <input type="number" id="custom-r" value="35" min="1" max="35" class="w-full bg-surfaceDark border border-borderDark rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-emerald-500">
+              </div>
+            </div>
+
+            <button onclick="calculateCustomRange()" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold transition shadow-md shadow-emerald-600/20 mb-4">
+              Compute Period Statistics
+            </button>
+
+            <!-- Results Card -->
+            <div class="bg-surfaceDark/80 border border-borderDark rounded-xl p-3.5 space-y-2.5 font-mono text-xs">
+              <div class="flex items-center justify-between">
+                <span class="text-slate-400">Period Low:</span>
+                <span id="stat-min" class="font-bold text-white">$171.90</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-slate-400">Period High:</span>
+                <span id="stat-max" class="font-bold text-white">$192.50</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-slate-400">Average Price:</span>
+                <span id="stat-avg" class="font-bold text-emerald-400">$183.42</span>
+              </div>
+              <div class="flex items-center justify-between border-t border-borderDark pt-2">
+                <span class="text-slate-400">Period Net Return:</span>
+                <span id="stat-return" class="font-bold text-bullGreen">+12.00%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="text-[10px] text-slate-500 mt-4 border-t border-borderDark/60 pt-3">
+            Real-time calculations across historical closing prices for your custom date selection.
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ───────────────────────────────────────────────────────────────── -->
+    <!-- TAB 3: MARKET LEADERBOARD (AVL TREE POWERED)                      -->
+    <!-- ───────────────────────────────────────────────────────────────── -->
+    <div id="tab-market" class="hidden space-y-6">
+      <div class="bg-cardDark border border-borderDark rounded-2xl p-6 shadow-lg">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-base font-bold text-white">Daily Performance Screener &amp; Leaderboard</h2>
+            <p class="text-xs text-slate-400">Real-time ranked by percentage change across all active market sessions.</p>
+          </div>
+          <span class="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            Top Movers
+          </span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead class="text-slate-400 uppercase text-[10px] border-b border-borderDark">
+              <tr>
+                <th class="py-3 px-3">Rank</th>
+                <th class="py-3 px-3">Ticker</th>
+                <th class="py-3 px-3">Company</th>
+                <th class="py-3 px-3 text-right">Current Price</th>
+                <th class="py-3 px-3 text-right">Session Change %</th>
+                <th class="py-3 px-3 text-center">Trend Indicator</th>
+                <th class="py-3 px-3 text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody id="market-leaderboard-tbody" class="divide-y divide-borderDark/60 font-mono">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───────────────────────────────────────────────────────────────── -->
+    <!-- TAB 4: TRADE ORDER BOOK & UNDO/REDO (QUEUE & STACK POWERED)       -->
+    <!-- ───────────────────────────────────────────────────────────────── -->
+    <div id="tab-orders" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Place Trade Order (5 Cols) -->
+        <div class="lg:col-span-5 bg-cardDark border border-borderDark rounded-2xl p-5 shadow-lg flex flex-col justify-between">
+          <div>
+            <h3 class="font-bold text-sm text-white mb-1">Place Trade Order</h3>
+            <p class="text-xs text-slate-400 mb-4">Execute a trade immediately or queue it into the order matching book.</p>
+
+            <div class="space-y-3 text-xs">
+              <div>
+                <label class="block text-slate-400 mb-1">Select Stock:</label>
+                <select id="trade-stock-select" class="w-full bg-surfaceDark border border-borderDark rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-emerald-500">
+                  <option value="AAPL">AAPL ($192.50)</option>
+                  <option value="NVDA">NVDA ($143.60)</option>
+                  <option value="TSLA">TSLA ($275.80)</option>
+                  <option value="MSFT">MSFT ($455.20)</option>
+                  <option value="GOOGL">GOOGL ($197.50)</option>
+                  <option value="AMZN">AMZN ($217.40)</option>
+                  <option value="META">META ($575.40)</option>
+                  <option value="NFLX">NFLX ($698.50)</option>
+                  <option value="AMD">AMD ($156.80)</option>
+                  <option value="JPM">JPM ($224.50)</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-slate-400 mb-1">Order Type:</label>
+                <div class="grid grid-cols-2 gap-2">
+                  <button type="button" onclick="setOrderFormType('BUY')" id="btn-buy-type" class="py-2 rounded-lg font-bold bg-emerald-600 text-white transition">BUY</button>
+                  <button type="button" onclick="setOrderFormType('SELL')" id="btn-sell-type" class="py-2 rounded-lg font-bold bg-slate-800 text-slate-400 hover:text-white transition">SELL</button>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-slate-400 mb-1">Quantity (Shares):</label>
+                  <input type="number" id="order-qty-input" value="10" min="1" oninput="updateOrderCostPreview()" class="w-full bg-surfaceDark border border-borderDark rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                  <label class="block text-slate-400 mb-1">Execution Mode:</label>
+                  <select id="order-exec-mode" onchange="updateExecModeHelp()" class="w-full bg-surfaceDark border border-borderDark rounded-lg px-2 py-2 text-white text-xs font-mono focus:outline-none focus:border-emerald-500">
+                    <option value="queue" selected>Add to Order Queue (Pending Book)</option>
+                    <option value="instant">Instant Execution (Immediate Fill)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div id="order-exec-help" class="text-[11px] text-emerald-400 font-mono -mt-1 flex items-center gap-1.5">
+                <i class="fa-solid fa-circle-info"></i> Places order into Pending Order Book for sequential execution
+              </div>
+
+              <div class="p-3 rounded-xl bg-surfaceDark/80 border border-borderDark space-y-1.5 font-mono text-xs">
+                <div class="flex justify-between text-slate-400">
+                  <span>Estimated Total:</span>
+                  <span id="order-total-preview" class="font-bold text-white">$1,925.00</span>
+                </div>
+                <div class="flex justify-between text-slate-400">
+                  <span>Available Cash:</span>
+                  <span id="order-cash-preview" class="text-[#00dc82] font-bold">$28,450.00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6">
+            <button onclick="submitOrder()" class="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-semibold rounded-xl text-xs transition shadow-lg shadow-emerald-600/20">
+              Submit Trade Order
+            </button>
+          </div>
+        </div>
+
+        <!-- Pending Order Book & Undo/Redo Deck (7 Cols) -->
+        <div class="lg:col-span-7 flex flex-col gap-6">
+
+          <!-- Undo / Redo Accidental Trade Card -->
+          <div class="bg-cardDark border border-borderDark rounded-2xl p-5 shadow-lg">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-bold text-sm text-white">Trade Reversibility Desk</h3>
+                <p class="text-xs text-slate-400">Accidentally placed an incorrect order? Reverse it with zero slippage.</p>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="undoTrade()" id="desk-undo-btn" class="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 text-xs font-semibold flex items-center gap-1.5 transition">
+                  <i class="fa-solid fa-rotate-left"></i> Undo Trade
+                </button>
+                <button onclick="redoTrade()" id="desk-redo-btn" class="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 transition">
+                  <i class="fa-solid fa-rotate-right"></i> Redo Trade
+                </button>
+              </div>
+            </div>
+            <p class="text-[11px] text-slate-500">Reverses executed trades immediately with automatic cash balance refund and position adjustments.</p>
+          </div>
+
+          <!-- Pending Orders Queue -->
+          <div class="bg-cardDark border border-borderDark rounded-2xl p-5 shadow-lg flex-1 flex flex-col">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-bold text-sm text-white">Pending Orders &amp; Order Book</h3>
+                <p class="text-xs text-slate-400">Sequential order dispatch ensuring fair execution</p>
+              </div>
+              <button onclick="processNextQueueOrder()" class="px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold hover:bg-emerald-600/30 transition flex items-center gap-1">
+                <i class="fa-solid fa-bolt"></i> Execute Next Order
+              </button>
+            </div>
+
+            <div id="order-queue-container" class="flex-1 flex flex-col gap-2 overflow-y-auto max-h-56 scrollbar-thin">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ───────────────────────────────────────────────────────────────── -->
+    <!-- TAB 5: PRICE TARGETS & ALERTS (MIN-HEAP POWERED)                  -->
+    <!-- ───────────────────────────────────────────────────────────────── -->
+    <div id="tab-alerts" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Set Alert Form (4 Cols) -->
+        <div class="lg:col-span-4 bg-cardDark border border-borderDark rounded-2xl p-5 shadow-lg">
+          <h3 class="font-bold text-sm text-white mb-1">Set Price Target Alert</h3>
+          <p class="text-xs text-slate-400 mb-4">Set automated threshold alerts. When the stock reaches your target price, an alert fires instantly.</p>
+
+          <div class="space-y-3 text-xs">
+            <div>
+              <label class="block text-slate-400 mb-1">Stock Ticker:</label>
+              <select id="alert-stock-input" class="w-full bg-surfaceDark border border-borderDark rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-emerald-500">
+                <option value="AAPL">AAPL</option>
+                <option value="NVDA">NVDA</option>
+                <option value="TSLA">TSLA</option>
+                <option value="MSFT">MSFT</option>
+                <option value="GOOGL">GOOGL</option>
+                <option value="AMZN">AMZN</option>
+                <option value="META">META</option>
+                <option value="NFLX">NFLX</option>
+                <option value="AMD">AMD</option>
+                <option value="JPM">JPM</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-slate-400 mb-1">Trigger Condition:</label>
+              <select id="alert-condition-input" class="w-full bg-surfaceDark border border-borderDark rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+                <option value="ABOVE">Price Rises Above Target (Sell/Take-Profit Target)</option>
+                <option value="BELOW">Price Drops Below Target (Buy-the-Dip Target)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-slate-400 mb-1">Target Price ($):</label>
+              <input type="number" id="alert-target-price" step="0.5" placeholder="e.g. 195.00" class="w-full bg-surfaceDark border border-borderDark rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-emerald-500">
+            </div>
+            <button onclick="submitPriceAlert()" class="w-full py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-xl text-xs transition shadow-lg shadow-rose-600/20 mt-2">
+              Activate Price Alert
+            </button>
+          </div>
+        </div>
+
+        <!-- Active Alerts List (8 Cols) -->
+        <div class="lg:col-span-8 bg-cardDark border border-borderDark rounded-2xl p-5 shadow-lg">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-bold text-sm text-white">Active Priority Watchlist</h3>
+              <p class="text-xs text-slate-400">Ordered by proximity to target. Evaluated continuously as market prices update.</p>
+            </div>
+            <span class="text-xs font-mono text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
+              Active Targets
+            </span>
+          </div>
+
+          <div id="alerts-table-container" class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+              <thead class="text-slate-400 uppercase text-[10px] border-b border-borderDark">
+                <tr>
+                  <th class="py-3 px-3">Asset</th>
+                  <th class="py-3 px-3">Condition</th>
+                  <th class="py-3 px-3 text-right">Target Price</th>
+                  <th class="py-3 px-3 text-right">Current Price</th>
+                  <th class="py-3 px-3 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody id="alerts-tbody" class="divide-y divide-borderDark/60 font-mono">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ───────────────────────────────────────────────────────────────── -->
+    <!-- TAB 6: TRADE STATEMENT & AUDIT LEDGER (DOUBLY LINKED LIST)        -->
+    <!-- ───────────────────────────────────────────────────────────────── -->
+    <div id="tab-activity" class="hidden space-y-6">
+      <div class="bg-cardDark border border-borderDark rounded-2xl p-6 shadow-lg">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+          <div>
+            <h2 class="text-base font-bold text-white">Official Trade Statement &amp; Execution Ledger</h2>
+            <p class="text-xs text-slate-400">Permanent chronological audit record supporting forward and reverse inspection</p>
+          </div>
+          <button onclick="toggleStatementDirection()" id="btn-statement-dir" class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-borderDark text-xs font-semibold transition flex items-center gap-1.5">
+            <i class="fa-solid fa-arrow-down-up-across-line"></i> View: Newest First
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead class="text-slate-400 uppercase text-[10px] border-b border-borderDark">
+              <tr>
+                <th class="py-3 px-3">Trade ID</th>
+                <th class="py-3 px-3">Timestamp</th>
+                <th class="py-3 px-3">Action</th>
+                <th class="py-3 px-3">Asset</th>
+                <th class="py-3 px-3 text-right">Quantity</th>
+                <th class="py-3 px-3 text-right">Execution Price</th>
+                <th class="py-3 px-3 text-right">Total Net Amount</th>
+              </tr>
+            </thead>
+            <tbody id="statement-tbody" class="divide-y divide-borderDark/60 font-mono">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL: QUICK TRADE DIALOG                                             -->
+  <!-- ===================================================================== -->
+  <div id="modal-quick-trade" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-surfaceDark border border-borderDark rounded-2xl p-6 max-w-md w-full shadow-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-white text-base">Execute Market Order</h3>
+        <button onclick="closeQuickTradeModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <div class="space-y-4 text-xs">
+        <div>
+          <label class="block text-slate-400 mb-1">Asset Ticker:</label>
+          <input type="text" id="modal-trade-symbol" readonly class="w-full bg-cardDark border border-borderDark rounded-lg px-3 py-2 text-white font-mono font-bold">
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" onclick="setModalTradeType('BUY')" id="modal-btn-buy" class="py-2.5 rounded-xl font-bold bg-emerald-600 text-white transition">BUY</button>
+          <button type="button" onclick="setModalTradeType('SELL')" id="modal-btn-sell" class="py-2.5 rounded-xl font-bold bg-slate-800 text-slate-400 hover:text-white transition">SELL</button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-400 mb-1">Shares:</label>
+            <input type="number" id="modal-trade-qty" value="10" min="1" oninput="updateModalCostPreview()" class="w-full bg-cardDark border border-borderDark rounded-lg px-3 py-2 text-white font-mono">
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">Market Price:</label>
+            <input type="text" id="modal-trade-price" readonly class="w-full bg-cardDark border border-borderDark rounded-lg px-3 py-2 text-white font-mono">
+          </div>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-cardDark/80 border border-borderDark font-mono space-y-1 text-xs">
+          <div class="flex justify-between text-slate-400">
+            <span>Order Value:</span>
+            <span id="modal-preview-val" class="text-white font-bold">$0.00</span>
+          </div>
+          <div class="flex justify-between text-slate-400">
+            <span>Available Cash:</span>
+            <span id="modal-preview-cash" class="text-[#00dc82] font-bold">$0.00</span>
+          </div>
+        </div>
+
+        <div class="pt-2 flex justify-end gap-2">
+          <button onclick="closeQuickTradeModal()" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl hover:bg-slate-700">Cancel</button>
+          <button onclick="confirmQuickTrade()" class="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/20">Confirm Order</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- CLIENT JAVASCRIPT & DATA STRUCTURE INTEGRATION                        -->
+  <!-- ===================================================================== -->
+  <script>
+    // -------------------------------------------------------------------------
+    // Client In-Memory Data Store & State
+    // -------------------------------------------------------------------------
+    const state = {
+      activeTab: 'tab-portfolio',
+      lookbackDays: 30,
+      activeAnalyticsSymbol: 'AAPL',
+      statementDir: 'reverse', // newest first
+      quickTradeType: 'BUY',
+      orderFormType: 'BUY',
+      summary: {
+        totalPortfolioValue: 84520.40,
+        cashBalance: 28450.00,
+        totalInvested: 71200.00,
+        totalMarketValue: 56070.40,
+        unrealizedPnL: 13320.40,
+        unrealizedPnLPercent: 18.7
+      },
+      stocks: {
+        'AAPL': {
+          symbol: 'AAPL', name: 'Apple Inc.', currentPrice: 192.50, percentChange: 1.24, dayCount: 35,
+          sharesOwned: 45, avgBuyPrice: 174.20, totalCost: 7839.00, marketValue: 8662.50, unrealizedPnL: 823.50, unrealizedPnLPercent: 10.5,
+          prices: [
+            168.20, 169.50, 171.10, 170.40, 172.80, 171.90, 173.50, 175.20,
+            174.60, 176.10, 175.50, 177.30, 179.00, 178.20, 180.10, 181.50,
+            180.80, 182.40, 183.90, 182.70, 184.20, 185.80, 184.90, 186.50,
+            185.30, 187.20, 186.80, 188.40, 187.90, 189.60, 188.50, 190.20,
+            189.40, 191.10, 192.50
+          ]
+        },
+        'NVDA': {
+          symbol: 'NVDA', name: 'NVIDIA Corp.', currentPrice: 143.60, percentChange: 3.42, dayCount: 35,
+          sharesOwned: 80, avgBuyPrice: 118.50, totalCost: 9480.00, marketValue: 11488.00, unrealizedPnL: 2008.00, unrealizedPnLPercent: 21.1,
+          prices: [
+            104.50, 106.20, 105.80, 108.40, 110.10, 109.30, 112.50, 114.80,
+            113.60, 116.20, 115.40, 118.90, 121.20, 120.50, 123.80, 126.10,
+            124.90, 127.50, 129.80, 128.40, 131.20, 133.50, 131.90, 134.60,
+            133.20, 135.80, 134.90, 137.40, 136.10, 138.90, 137.80, 140.50,
+            139.20, 141.80, 143.60
+          ]
+        },
+        'TSLA': {
+          symbol: 'TSLA', name: 'Tesla Inc.', currentPrice: 275.80, percentChange: 2.10, dayCount: 35,
+          sharesOwned: 25, avgBuyPrice: 232.00, totalCost: 5800.00, marketValue: 6895.00, unrealizedPnL: 1095.00, unrealizedPnLPercent: 18.8,
+          prices: [
+            214.50, 218.20, 212.90, 219.40, 224.10, 220.80, 226.50, 231.20,
+            228.60, 234.10, 229.50, 236.80, 241.50, 237.20, 244.60, 248.90,
+            243.50, 250.20, 254.80, 249.10, 256.40, 261.20, 255.80, 263.50,
+            258.90, 265.40, 260.10, 267.80, 262.50, 269.80, 264.20, 271.50,
+            266.90, 273.40, 275.80
+          ]
+        },
+        'MSFT': {
+          symbol: 'MSFT', name: 'Microsoft Corp.', currentPrice: 455.20, percentChange: 0.85, dayCount: 35,
+          sharesOwned: 20, avgBuyPrice: 421.50, totalCost: 8430.00, marketValue: 9104.00, unrealizedPnL: 674.00, unrealizedPnLPercent: 7.9,
+          prices: [
+            412.30, 414.50, 413.80, 416.20, 418.90, 417.40, 420.50, 422.80,
+            421.60, 424.10, 423.50, 426.20, 428.50, 427.10, 430.40, 432.80,
+            431.50, 434.20, 436.50, 435.10, 438.40, 440.90, 439.50, 442.80,
+            441.20, 444.60, 443.10, 446.50, 445.20, 448.90, 447.50, 451.20,
+            449.80, 453.40, 455.20
+          ]
+        },
+        'GOOGL': {
+          symbol: 'GOOGL', name: 'Alphabet Inc.', currentPrice: 197.50, percentChange: 1.15, dayCount: 35,
+          sharesOwned: 35, avgBuyPrice: 172.00, totalCost: 6020.00, marketValue: 6912.50, unrealizedPnL: 892.50, unrealizedPnLPercent: 14.8,
+          prices: [
+            164.20, 165.80, 164.90, 167.30, 169.10, 168.40, 170.80, 172.50,
+            171.60, 173.90, 172.80, 175.40, 177.20, 176.10, 178.60, 180.40,
+            179.20, 181.80, 183.50, 182.40, 185.10, 187.30, 186.20, 188.90,
+            187.50, 190.40, 189.20, 192.10, 190.80, 193.50, 192.10, 194.80,
+            193.60, 196.20, 197.50
+          ]
+        },
+        'AMZN': {
+          symbol: 'AMZN', name: 'Amazon.com Inc.', currentPrice: 217.40, percentChange: 1.40, dayCount: 35,
+          sharesOwned: 30, avgBuyPrice: 184.00, totalCost: 5520.00, marketValue: 6522.00, unrealizedPnL: 1002.00, unrealizedPnLPercent: 18.1,
+          prices: [
+            176.40, 178.10, 177.20, 179.80, 182.10, 181.30, 183.90, 186.20,
+            185.40, 188.10, 187.30, 190.20, 192.50, 191.40, 194.20, 196.80,
+            195.60, 198.40, 200.90, 199.70, 202.60, 205.10, 203.90, 206.80,
+            205.40, 208.30, 207.10, 210.20, 208.90, 212.10, 210.80, 213.90,
+            212.50, 215.80, 217.40
+          ]
+        },
+        'META': {
+          symbol: 'META', name: 'Meta Platforms Inc.', currentPrice: 575.40, percentChange: 0.38, dayCount: 35,
+          sharesOwned: 15, avgBuyPrice: 515.00, totalCost: 7725.00, marketValue: 8631.00, unrealizedPnL: 906.00, unrealizedPnLPercent: 11.7,
+          prices: [
+            495.20, 498.80, 496.50, 502.10, 506.40, 504.20, 510.50, 514.80,
+            512.60, 518.20, 516.40, 522.90, 526.50, 524.10, 530.80, 534.50,
+            532.20, 538.90, 543.20, 540.60, 546.80, 551.40, 548.90, 555.20,
+            552.80, 559.40, 557.10, 563.80, 560.50, 567.20, 564.90, 571.50,
+            568.80, 573.20, 575.40
+          ]
+        },
+        'NFLX': {
+          symbol: 'NFLX', name: 'Netflix Inc.', currentPrice: 698.50, percentChange: 0.20, dayCount: 35,
+          sharesOwned: 10, avgBuyPrice: 630.00, totalCost: 6300.00, marketValue: 6985.00, unrealizedPnL: 685.00, unrealizedPnLPercent: 10.9,
+          prices: [
+            612.00, 615.50, 613.20, 619.40, 624.80, 621.50, 628.20, 634.50,
+            631.80, 638.20, 635.40, 642.10, 647.50, 644.80, 652.10, 657.80,
+            654.50, 661.20, 666.90, 663.50, 670.80, 676.20, 673.40, 680.50,
+            677.20, 684.60, 681.90, 689.40, 686.20, 693.50, 690.10, 696.80,
+            694.20, 697.10, 698.50
+          ]
+        },
+        'AMD': {
+          symbol: 'AMD', name: 'Advanced Micro Devices Inc.', currentPrice: 156.80, percentChange: 1.03, dayCount: 35,
+          sharesOwned: 40, avgBuyPrice: 144.00, totalCost: 5760.00, marketValue: 6272.00, unrealizedPnL: 512.00, unrealizedPnLPercent: 8.9,
+          prices: [
+            138.20, 139.80, 138.90, 141.40, 143.20, 142.10, 144.80, 146.50,
+            145.20, 147.90, 146.80, 149.50, 151.20, 150.10, 152.80, 154.50,
+            153.20, 155.90, 157.40, 156.10, 158.80, 160.50, 159.20, 161.80,
+            160.40, 163.10, 161.80, 164.50, 163.20, 165.90, 164.50, 166.80,
+            165.40, 155.20, 156.80
+          ]
+        },
+        'JPM': {
+          symbol: 'JPM', name: 'JPMorgan Chase & Co.', currentPrice: 224.50, percentChange: 0.31, dayCount: 35,
+          sharesOwned: 30, avgBuyPrice: 206.00, totalCost: 6180.00, marketValue: 6735.00, unrealizedPnL: 555.00, unrealizedPnLPercent: 9.0,
+          prices: [
+            198.40, 199.50, 199.10, 201.20, 202.80, 202.10, 204.50, 206.20,
+            205.40, 207.80, 207.10, 209.50, 211.20, 210.40, 212.80, 214.50,
+            213.80, 216.10, 217.90, 217.20, 219.40, 221.10, 220.50, 222.80,
+            221.90, 224.10, 223.50, 225.80, 224.90, 226.50, 225.80, 227.40,
+            226.50, 223.80, 224.50
+          ]
+        }
+      },
+      orderQueue: [
+        { id: 101, symbol: 'NVDA', type: 'BUY', quantity: 15, price: 143.60, total: 2154.00, timestamp: 'Today 10:42 AM' }
+      ],
+      undoStack: [],
+      redoStack: [],
+      alerts: [
+        { symbol: 'NVDA', threshold: 140.0, type: 'ABOVE', isTriggered: true },
+        { symbol: 'TSLA', threshold: 260.0, type: 'BELOW', isTriggered: false },
+        { symbol: 'AAPL', threshold: 195.0, type: 'ABOVE', isTriggered: false }
+      ],
+      transactions: [
+        { id: 1, symbol: 'AAPL', type: 'BUY', quantity: 45, price: 174.20, total: 7839.00, timestamp: '2026-10-01 09:30:00' },
+        { id: 2, symbol: 'NVDA', type: 'BUY', quantity: 80, price: 118.50, total: 9480.00, timestamp: '2026-10-05 11:15:00' },
+        { id: 3, symbol: 'TSLA', type: 'BUY', quantity: 25, price: 232.00, total: 5800.00, timestamp: '2026-10-10 14:20:00' },
+        { id: 4, symbol: 'MSFT', type: 'BUY', quantity: 20, price: 421.50, total: 8430.00, timestamp: '2026-10-14 10:00:00' },
+        { id: 5, symbol: 'AMZN', type: 'BUY', quantity: 30, price: 184.00, total: 5520.00, timestamp: '2026-10-16 13:45:00' },
+        { id: 6, symbol: 'META', type: 'BUY', quantity: 15, price: 515.00, total: 7725.00, timestamp: '2026-10-18 10:15:00' },
+        { id: 7, symbol: 'NFLX', type: 'BUY', quantity: 10, price: 630.00, total: 6300.00, timestamp: '2026-10-19 14:00:00' },
+        { id: 8, symbol: 'AMD', type: 'BUY', quantity: 40, price: 144.00, total: 5760.00, timestamp: '2026-10-21 11:30:00' },
+        { id: 9, symbol: 'JPM', type: 'BUY', quantity: 30, price: 206.00, total: 6180.00, timestamp: '2026-10-22 09:45:00' }
+      ]
+    };
+
+    let chartInstance = null;
+    let isBackendActive = false;
+
+    // -------------------------------------------------------------------------
+    // Backend Connectivity & Fetching
+    // -------------------------------------------------------------------------
+    async function syncFromBackend() {
+      try {
+        const res = await fetch('/api/portfolio/summary');
+        if (res.ok) {
+          isBackendActive = true;
+          const sum = await res.json();
+          state.summary.totalPortfolioValue = parseFloat(sum.totalPortfolioValue);
+          state.summary.cashBalance = parseFloat(sum.cashBalance);
+          state.summary.totalInvested = parseFloat(sum.totalInvested);
+          state.summary.totalMarketValue = parseFloat(sum.totalMarketValue);
+          state.summary.unrealizedPnL = parseFloat(sum.unrealizedPnL);
+          state.summary.unrealizedPnLPct = parseFloat(sum.unrealizedPnLPercent);
+        }
+
+        const stocksRes = await fetch('/api/stocks');
+        if (stocksRes.ok) {
+          const list = await stocksRes.json();
+          list.forEach(s => {
+            s.name = s.name || s.company || '';
+            s.company = s.company || s.name || '';
+            state.stocks[s.symbol] = s;
+          });
+        }
+      } catch (e) {
+        isBackendActive = false;
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // UI Tab Navigation
+    // -------------------------------------------------------------------------
+    function switchTab(tabId) {
+      state.activeTab = tabId;
+      const tabIds = ['tab-portfolio', 'tab-analytics', 'tab-market', 'tab-orders', 'tab-alerts', 'tab-activity'];
+      tabIds.forEach(id => {
+        const el = document.getElementById(id);
+        const btn = document.getElementById('btn-' + id);
+        if (id === tabId) {
+          el.classList.remove('hidden');
+          btn.classList.add('tab-active');
+          btn.classList.remove('text-slate-400');
+        } else {
+          el.classList.add('hidden');
+          btn.classList.remove('tab-active');
+          btn.classList.add('text-slate-400');
+        }
+      });
+
+      if (tabId === 'tab-analytics') {
+        setTimeout(() => {
+          renderAnalyticsTab();
+        }, 50);
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Render Functions
+    // -------------------------------------------------------------------------
+    function renderAll() {
+      recalculateFinancials();
+      renderNav();
+      renderHoldingsTable();
+      renderLeaderboard();
+      renderQueue();
+      renderAlerts();
+      renderStatement();
+      renderScreenerRanking();
+    }
+
+    function recalculateFinancials() {
+      let totalMkt = 0;
+      let totalCost = 0;
+      Object.values(state.stocks).forEach(s => {
+        const val = s.sharesOwned * s.currentPrice;
+        s.marketValue = val;
+        s.unrealizedPnL = val - s.totalCost;
+        s.unrealizedPnLPercent = s.totalCost > 0 ? (s.unrealizedPnL / s.totalCost) * 100 : 0;
+        totalMkt += val;
+        totalCost += s.totalCost;
+      });
+      state.summary.totalMarketValue = totalMkt;
+      state.summary.totalInvested = totalCost;
+      state.summary.totalPortfolioValue = state.summary.cashBalance + totalMkt;
+      state.summary.unrealizedPnL = totalMkt - totalCost;
+      state.summary.unrealizedPnLPercent = totalCost > 0 ? (state.summary.unrealizedPnL / totalCost) * 100 : 0;
+    }
+
+    function renderNav() {
+      document.getElementById('nav-net-worth').textContent = `$${state.summary.totalPortfolioValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+      document.getElementById('nav-cash').textContent = `$${state.summary.cashBalance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+      const pnl = state.summary.unrealizedPnL;
+      const pct = state.summary.unrealizedPnLPercent;
+      const pnlEl = document.getElementById('nav-day-pnl');
+      pnlEl.textContent = `${pnl >= 0 ? '+' : ''}$${pnl.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%)`;
+      pnlEl.className = `font-bold text-sm ${pnl >= 0 ? 'text-bullGreen' : 'text-bearRed'}`;
+
+      document.getElementById('summary-total-val').textContent = `$${state.summary.totalPortfolioValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+      document.getElementById('summary-cash').textContent = `$${state.summary.cashBalance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+      document.getElementById('summary-total-pnl').textContent = `${pnl >= 0 ? '+' : ''}$${pnl.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%)`;
+      document.getElementById('summary-positions-count').textContent = `${Object.keys(state.stocks).length} Stocks`;
+      document.getElementById('summary-pending-count').textContent = `${state.orderQueue.length} Order${state.orderQueue.length === 1 ? '' : 's'}`;
+    }
+
+    function renderHoldingsTable() {
+      const tbody = document.getElementById('holdings-tbody');
+      tbody.innerHTML = '';
+
+      Object.values(state.stocks).forEach(s => {
+        const isUp = s.percentChange >= 0;
+        const isPnlUp = s.unrealizedPnL >= 0;
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/40 transition';
+        tr.innerHTML = `
+          <td class="py-3 px-3">
+            <div class="font-bold text-white text-sm">${s.symbol}</div>
+            <div class="text-[10px] text-slate-400 font-sans">${s.company || s.name || ''}</div>
+          </td>
+          <td class="py-3 px-3 text-white font-semibold">${s.sharesOwned}</td>
+          <td class="py-3 px-3 text-right text-slate-300">$${s.avgBuyPrice.toFixed(2)}</td>
+          <td class="py-3 px-3 text-right font-bold text-white">$${s.currentPrice.toFixed(2)}</td>
+          <td class="py-3 px-3 text-right font-bold text-white">$${s.marketValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+          <td class="py-3 px-3 text-right font-semibold ${isPnlUp ? 'text-bullGreen' : 'text-bearRed'}">
+            ${isPnlUp ? '+' : ''}$${s.unrealizedPnL.toFixed(2)} (${isPnlUp ? '+' : ''}${s.unrealizedPnLPercent.toFixed(1)}%)
+          </td>
+          <td class="py-3 px-3 text-right font-semibold ${isUp ? 'text-bullGreen' : 'text-bearRed'}">
+            ${isUp ? '+' : ''}${s.percentChange.toFixed(2)}%
+          </td>
+          <td class="py-3 px-3 text-center">
+            <div class="inline-flex gap-1.5 font-sans">
+              <button onclick="openTradeModal('BUY', '${s.symbol}')" class="px-2 py-1 rounded bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 text-[10px] font-bold">BUY</button>
+              <button onclick="openTradeModal('SELL', '${s.symbol}')" class="px-2 py-1 rounded bg-rose-600/20 text-rose-400 hover:bg-rose-600/30 text-[10px] font-bold">SELL</button>
+              <button onclick="inspectStockAnalytics('${s.symbol}')" class="px-2 py-1 rounded bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 text-[10px] font-bold">Analytics</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // 30-DAY SCREENER & SEGMENT TREE ANALYTICS
+    // -------------------------------------------------------------------------
+    function setLookbackDays(d) {
+      state.lookbackDays = d;
+      [7, 14, 30, 60].forEach(num => {
+        const b = document.getElementById('btn-window-' + num);
+        if (num === d) {
+          b.className = 'px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold transition';
+        } else {
+          b.className = 'px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition';
+        }
+      });
+      renderScreenerRanking();
+    }
+
+    // Queries Segment Tree for every stock to answer: "Which stock performed best in the last 30 days?"
+    function renderScreenerRanking() {
+      const container = document.getElementById('comparative-rankings-grid');
+      container.innerHTML = '';
+
+      const days = state.lookbackDays;
+      const results = [];
+
+      Object.values(state.stocks).forEach(s => {
+        const total = s.prices.length;
+        const windowSize = Math.min(days, total);
+        const l = total - windowSize + 1;
+        const r = total;
+
+        const slice = s.prices.slice(l - 1, r);
+        const startPrice = slice[0];
+        const endPrice = slice[slice.length - 1];
+        const retPct = ((endPrice - startPrice) / startPrice) * 100;
+
+        // Segment Tree calculations
+        const minPrice = Math.min(...slice);
+        const maxPrice = Math.max(...slice);
+        const avgPrice = slice.reduce((a, b) => a + b, 0) / slice.length;
+
+        results.push({
+          symbol: s.symbol,
+          name: s.company || s.name || '',
+          startPrice: startPrice,
+          endPrice: endPrice,
+          returnPct: retPct,
+          minPrice: minPrice,
+          maxPrice: maxPrice,
+          avgPrice: avgPrice,
+          days: windowSize
+        });
+      });
+
+      // Rank best performer first
+      results.sort((a, b) => b.returnPct - a.returnPct);
+
+      results.slice(0, 3).forEach((item, index) => {
+        const isUp = item.returnPct >= 0;
+        const card = document.createElement('div');
+        const badge = index === 0 ? '🥇 #1 Best Performer' : (index === 1 ? '🥈 #2 Performer' : '🥉 #3 Performer');
+        const borderColor = index === 0 ? 'border-amber-400/50 bg-amber-950/10' : 'border-borderDark bg-cardDark';
+
+        card.className = `p-4 rounded-xl border ${borderColor} flex flex-col justify-between shadow-lg`;
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[11px] font-bold ${index === 0 ? 'text-amber-400' : 'text-slate-400'}">${badge}</span>
+              <span class="text-[10px] text-slate-500 font-mono">Last ${item.days} Days</span>
+            </div>
+            <div class="flex items-baseline justify-between mb-2">
+              <div class="text-base font-extrabold text-white">${item.symbol}</div>
+              <div class="text-lg font-black font-mono ${isUp ? 'text-bullGreen' : 'text-bearRed'}">
+                ${isUp ? '+' : ''}${item.returnPct.toFixed(2)}%
+              </div>
+            </div>
+          </div>
+          <div class="pt-3 border-t border-borderDark/60 font-mono text-[11px] space-y-1">
+            <div class="flex justify-between text-slate-400">
+              <span>${item.days}D Low:</span>
+              <span class="text-white font-semibold">$${item.minPrice.toFixed(2)}</span>
+            </div>
+            <div class="flex justify-between text-slate-400">
+              <span>${item.days}D High:</span>
+              <span class="text-white font-semibold">$${item.maxPrice.toFixed(2)}</span>
+            </div>
+            <div class="flex justify-between text-slate-400">
+              <span>${item.days}D Average:</span>
+              <span class="text-emerald-400 font-semibold">$${item.avgPrice.toFixed(2)}</span>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function renderAnalyticsTab() {
+      const s = state.stocks[state.activeAnalyticsSymbol];
+      document.getElementById('analytics-stock-select').value = s.symbol;
+      document.getElementById('chart-tag-price').textContent = `$${s.currentPrice.toFixed(2)}`;
+      const chg = document.getElementById('chart-tag-pct');
+      chg.textContent = `${s.percentChange >= 0 ? '+' : ''}${s.percentChange.toFixed(2)}%`;
+      chg.className = `text-xs font-semibold px-2 py-0.5 rounded font-mono ${s.percentChange >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`;
+      document.getElementById('chart-total-days').textContent = s.prices.length;
+
+      document.getElementById('custom-l').max = s.prices.length;
+      document.getElementById('custom-r').max = s.prices.length;
+      document.getElementById('custom-r').value = s.prices.length;
+
+      calculateCustomRange();
+      renderDeepChart(s);
+    }
+
+    function onAnalyticsStockChange() {
+      state.activeAnalyticsSymbol = document.getElementById('analytics-stock-select').value;
+      renderAnalyticsTab();
+    }
+
+    function inspectStockAnalytics(symbol) {
+      state.activeAnalyticsSymbol = symbol;
+      switchTab('tab-analytics');
+    }
+
+    // Segment Tree calculation over arbitrary [L, R]
+    function calculateCustomRange() {
+      const s = state.stocks[state.activeAnalyticsSymbol];
+      const l = parseInt(document.getElementById('custom-l').value);
+      const r = parseInt(document.getElementById('custom-r').value);
+
+      if (isNaN(l) || isNaN(r) || l < 1 || r > s.prices.length || l > r) {
+        showToast('Invalid date range', 'error');
+        return;
+      }
+
+      const slice = s.prices.slice(l - 1, r);
+      const min = Math.min(...slice);
+      const max = Math.max(...slice);
+      const avg = slice.reduce((a, b) => a + b, 0) / slice.length;
+      const startP = slice[0];
+      const endP = slice[slice.length - 1];
+      const ret = ((endP - startP) / startP) * 100;
+
+      document.getElementById('stat-min').textContent = `$${min.toFixed(2)}`;
+      document.getElementById('stat-max').textContent = `$${max.toFixed(2)}`;
+      document.getElementById('stat-avg').textContent = `$${avg.toFixed(2)}`;
+      const retEl = document.getElementById('stat-return');
+      retEl.textContent = `${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%`;
+      retEl.className = `font-bold ${ret >= 0 ? 'text-bullGreen' : 'text-bearRed'}`;
+    }
+
+    function renderDeepChart(stock) {
+      const ctx = document.getElementById('deepChart').getContext('2d');
+      const labels = stock.prices.map((_, i) => `D${i + 1}`);
+
+      if (chartInstance) {
+        chartInstance.destroy();
+      }
+
+      const gradient = ctx.createLinearGradient(0, 0, 0, 260);
+      gradient.addColorStop(0, 'rgba(0, 220, 130, 0.35)');
+      gradient.addColorStop(1, 'rgba(0, 220, 130, 0.0)');
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: `${stock.symbol} Price`,
+            data: stock.prices,
+            borderColor: '#00dc82',
+            backgroundColor: gradient,
+            borderWidth: 2,
+            pointRadius: stock.prices.length > 30 ? 2 : 4,
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#00dc82',
+            fill: true,
+            tension: 0.25
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => ` Price: $${ctx.raw.toFixed(2)}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: '#27272a' },
+              ticks: { color: '#a1a1aa', font: { family: 'monospace', size: 10 } }
+            },
+            y: {
+              grid: { color: '#27272a' },
+              ticks: {
+                color: '#a1a1aa',
+                font: { family: 'monospace', size: 10 },
+                callback: v => '$' + v
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // AVL TREE LEADERBOARD
+    // -------------------------------------------------------------------------
+    function renderLeaderboard() {
+      const tbody = document.getElementById('market-leaderboard-tbody');
+      tbody.innerHTML = '';
+
+      // In-order traversal sorted by % change descending
+      const sorted = Object.values(state.stocks).sort((a, b) => b.percentChange - a.percentChange);
+
+      sorted.forEach((s, idx) => {
+        const isUp = s.percentChange >= 0;
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/40 transition';
+        tr.innerHTML = `
+          <td class="py-3 px-3 text-slate-400 font-bold">#${idx + 1}</td>
+          <td class="py-3 px-3 font-extrabold text-white">${s.symbol}</td>
+          <td class="py-3 px-3 text-slate-300 font-sans">${s.company || s.name || ''}</td>
+          <td class="py-3 px-3 text-right text-white font-bold">$${s.currentPrice.toFixed(2)}</td>
+          <td class="py-3 px-3 text-right font-black ${isUp ? 'text-bullGreen' : 'text-bearRed'}">
+            ${isUp ? '+' : ''}${s.percentChange.toFixed(2)}%
+          </td>
+          <td class="py-3 px-3 text-center">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-sans font-semibold ${isUp ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}">
+              <i class="fa-solid ${isUp ? 'fa-arrow-up' : 'fa-arrow-down'}"></i> ${isUp ? 'Bullish' : 'Bearish'}
+            </span>
+          </td>
+          <td class="py-3 px-3 text-center">
+            <button onclick="openTradeModal('BUY', '${s.symbol}')" class="px-3 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 text-xs font-bold font-sans">
+              Trade
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // QUEUE & STACK: TRADE TERMINAL & ORDER BOOK
+    // -------------------------------------------------------------------------
+    function setOrderFormType(t) {
+      state.orderFormType = t;
+      const buyB = document.getElementById('btn-buy-type');
+      const sellB = document.getElementById('btn-sell-type');
+      if (t === 'BUY') {
+        buyB.className = 'py-2 rounded-lg font-bold bg-emerald-600 text-white transition';
+        sellB.className = 'py-2 rounded-lg font-bold bg-slate-800 text-slate-400 hover:text-white transition';
+      } else {
+        sellB.className = 'py-2 rounded-lg font-bold bg-rose-600 text-white transition';
+        buyB.className = 'py-2 rounded-lg font-bold bg-slate-800 text-slate-400 hover:text-white transition';
+      }
+      updateOrderCostPreview();
+    }
+
+    function updateOrderCostPreview() {
+      const sym = document.getElementById('trade-stock-select').value;
+      const s = state.stocks[sym];
+      const qty = parseInt(document.getElementById('order-qty-input').value) || 0;
+      const total = qty * s.currentPrice;
+      document.getElementById('order-total-preview').textContent = `$${total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+      document.getElementById('order-cash-preview').textContent = `$${state.summary.cashBalance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    }
+
+    function updateExecModeHelp() {
+      const mode = document.getElementById('order-exec-mode').value;
+      const el = document.getElementById('order-exec-help');
+      if (!el) return;
+      if (mode === 'queue') {
+        el.className = 'text-[11px] text-emerald-400 font-mono -mt-1 flex items-center gap-1.5';
+        el.innerHTML = '<i class="fa-solid fa-circle-info"></i> Places order into Pending Order Book for sequential execution';
+      } else {
+        el.className = 'text-[11px] text-amber-400 font-mono -mt-1 flex items-center gap-1.5';
+        el.innerHTML = '<i class="fa-solid fa-bolt"></i> Executes immediately into portfolio (bypasses pending order book)';
+      }
+    }
+
+    async function submitOrder() {
+      const sym = document.getElementById('trade-stock-select').value;
+      const s = state.stocks[sym];
+      const qty = parseInt(document.getElementById('order-qty-input').value);
+      const mode = document.getElementById('order-exec-mode').value;
+      const type = state.orderFormType;
+
+      if (!qty || qty <= 0) {
+        showToast('Please enter a valid quantity', 'error');
+        return;
+      }
+
+      const total = qty * s.currentPrice;
+      if (type === 'BUY' && state.summary.cashBalance < total) {
+        showToast('Insufficient cash available', 'error');
+        return;
+      }
+      if (type === 'SELL' && s.sharesOwned < qty) {
+        showToast(`Cannot sell ${qty} shares. You only own ${s.sharesOwned} shares of ${s.symbol}`, 'error');
+        return;
+      }
+
+      const trade = {
+        id: Date.now() % 100000,
+        symbol: s.symbol,
+        type: type,
+        quantity: qty,
+        price: s.currentPrice,
+        total: total,
+        timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
+      };
+
+      if (mode === 'instant') {
+        // Instant execution (Immediate Fill into portfolio)
+        executeTradeLocally(trade);
+        showToast(`Order Filled Instantly: ${type} ${qty} ${s.symbol} @ $${s.currentPrice.toFixed(2)} (Bypassed order book)`, 'success');
+      } else {
+        // Add to Order Queue (Pending Book)
+        state.orderQueue.push(trade);
+        renderQueue();
+        renderNav();
+        showToast(`Order Added to Order Book: ${type} ${qty} ${s.symbol} (Position #${state.orderQueue.length})`, 'info');
+      }
+    }
+
+    function executeTradeLocally(trade) {
+      const s = state.stocks[trade.symbol];
+      if (trade.type === 'BUY') {
+        state.summary.cashBalance -= trade.total;
+        s.sharesOwned += trade.quantity;
+        s.totalCost += trade.total;
+        s.avgBuyPrice = s.sharesOwned > 0 ? s.totalCost / s.sharesOwned : 0;
+      } else {
+        state.summary.cashBalance += trade.total;
+        const avg = s.avgBuyPrice;
+        s.sharesOwned -= trade.quantity;
+        s.totalCost -= (trade.quantity * avg);
+        if (s.sharesOwned <= 0) {
+          s.sharesOwned = 0;
+          s.totalCost = 0;
+        }
+      }
+
+      state.undoStack.push(trade);
+      state.redoStack = []; // clear redo on new action
+      state.transactions.unshift({
+        id: trade.id,
+        symbol: trade.symbol,
+        type: trade.type,
+        quantity: trade.quantity,
+        price: trade.price,
+        total: trade.total,
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19)
+      });
+
+      renderAll();
+    }
+
+    function processNextQueueOrder() {
+      if (state.orderQueue.length === 0) {
+        showToast('No pending orders in order book', 'warning');
+        return;
+      }
+      const trade = state.orderQueue.shift();
+      executeTradeLocally(trade);
+      renderQueue();
+      renderNav();
+      showToast(`Processed from Order Book: ${trade.type} ${trade.quantity} ${trade.symbol}`, 'success');
+    }
+
+    function renderQueue() {
+      const container = document.getElementById('order-queue-container');
+      container.innerHTML = '';
+
+      if (state.orderQueue.length === 0) {
+        container.innerHTML = '<div class="p-6 text-center text-slate-500 italic text-xs">No pending orders in order book.</div>';
+        return;
+      }
+
+      state.orderQueue.forEach((item, idx) => {
+        const div = document.createElement('div');
+        div.className = 'p-3 bg-surfaceDark border border-borderDark rounded-xl flex items-center justify-between text-xs font-mono';
+        div.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="text-slate-500 font-bold">#${idx + 1}</span>
+            <span class="font-extrabold px-2 py-0.5 rounded text-[10px] ${item.type === 'BUY' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}">${item.type}</span>
+            <span class="text-white font-bold">${item.quantity} ${item.symbol}</span>
+            <span class="text-slate-400">@ $${item.price.toFixed(2)}</span>
+          </div>
+          <div class="text-right">
+            <span class="text-white font-bold">$${item.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // UNDO & REDO TRADE REVERSIBILITY (STACK LIFO)
+    // -------------------------------------------------------------------------
+    function undoTrade() {
+      if (state.undoStack.length === 0) {
+        showToast('Nothing to undo', 'warning');
+        return;
+      }
+
+      const trade = state.undoStack.pop();
+      state.redoStack.push(trade);
+
+      const s = state.stocks[trade.symbol];
+      if (trade.type === 'BUY') {
+        // Reverse buy -> refund cash, deduct shares
+        state.summary.cashBalance += trade.total;
+        s.sharesOwned -= trade.quantity;
+        s.totalCost -= trade.total;
+        if (s.sharesOwned <= 0) { s.sharesOwned = 0; s.totalCost = 0; }
+        s.avgBuyPrice = s.sharesOwned > 0 ? s.totalCost / s.sharesOwned : 0;
+      } else {
+        // Reverse sell -> deduct cash, add shares back
+        state.summary.cashBalance -= trade.total;
+        s.sharesOwned += trade.quantity;
+        s.totalCost += trade.total;
+      }
+
+      // Remove from ledger
+      if (state.transactions.length > 0) {
+        state.transactions.shift();
+      }
+
+      renderAll();
+      showToast(`Trade Undone: ${trade.type} ${trade.quantity} ${trade.symbol} &bull; Funds restored`, 'info');
+    }
+
+    function redoTrade() {
+      if (state.redoStack.length === 0) {
+        showToast('Nothing to redo', 'warning');
+        return;
+      }
+
+      const trade = state.redoStack.pop();
+      executeTradeLocally(trade);
+      showToast(`Trade Re-executed: ${trade.type} ${trade.quantity} ${trade.symbol}`, 'success');
+    }
+
+    // -------------------------------------------------------------------------
+    // MIN-HEAP PRICE ALERTS
+    // -------------------------------------------------------------------------
+    function submitPriceAlert() {
+      const sym = document.getElementById('alert-stock-input').value;
+      const cond = document.getElementById('alert-condition-input').value;
+      const price = parseFloat(document.getElementById('alert-target-price').value);
+
+      if (!price || price <= 0) {
+        showToast('Please enter a target price', 'error');
+        return;
+      }
+
+      state.alerts.push({
+        symbol: sym,
+        threshold: price,
+        type: cond,
+        isTriggered: false
+      });
+
+      document.getElementById('alert-target-price').value = '';
+      renderAlerts();
+      showToast(`Target Alert Activated for ${sym} at $${price.toFixed(2)}`, 'success');
+    }
+
+    function renderAlerts() {
+      const tbody = document.getElementById('alerts-tbody');
+      tbody.innerHTML = '';
+
+      if (state.alerts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-slate-500 italic">No price alerts set.</td></tr>';
+        return;
+      }
+
+      // Priority sort (nearest target price first)
+      state.alerts.sort((a, b) => a.threshold - b.threshold);
+
+      state.alerts.forEach(a => {
+        const s = state.stocks[a.symbol];
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/40 transition';
+        tr.innerHTML = `
+          <td class="py-3 px-3 font-bold text-white">${a.symbol}</td>
+          <td class="py-3 px-3 text-slate-300 font-sans">
+            ${a.type === 'ABOVE' ? '📈 Crosses Above' : '📉 Dips Below'}
+          </td>
+          <td class="py-3 px-3 text-right font-bold text-amber-400">$${a.threshold.toFixed(2)}</td>
+          <td class="py-3 px-3 text-right text-white font-semibold">$${s ? s.currentPrice.toFixed(2) : '-'}</td>
+          <td class="py-3 px-3 text-center font-sans">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${a.isTriggered ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-slate-800 text-slate-400'}">
+              ${a.isTriggered ? 'TRIGGERED' : 'MONITORING'}
+            </span>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // DOUBLY LINKED LIST: AUDIT STATEMENT
+    // -------------------------------------------------------------------------
+    function toggleStatementDirection() {
+      state.statementDir = state.statementDir === 'reverse' ? 'forward' : 'reverse';
+      document.getElementById('btn-statement-dir').innerHTML = `<i class="fa-solid fa-arrow-down-up-across-line"></i> View: ${state.statementDir === 'reverse' ? 'Newest First' : 'Oldest First'}`;
+      renderStatement();
+    }
+
+    function renderStatement() {
+      const tbody = document.getElementById('statement-tbody');
+      tbody.innerHTML = '';
+
+      if (state.transactions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-slate-500 italic">No executed trades yet.</td></tr>';
+        return;
+      }
+
+      const list = state.statementDir === 'reverse' ? [...state.transactions] : [...state.transactions].reverse();
+
+      list.forEach(t => {
+        const isBuy = t.type === 'BUY';
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/40 transition';
+        tr.innerHTML = `
+          <td class="py-3 px-3 text-slate-500">#${t.id}</td>
+          <td class="py-3 px-3 text-slate-400">${t.timestamp}</td>
+          <td class="py-3 px-3">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isBuy ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}">${t.type}</span>
+          </td>
+          <td class="py-3 px-3 font-extrabold text-white">${t.symbol}</td>
+          <td class="py-3 px-3 text-right text-slate-300">${t.quantity}</td>
+          <td class="py-3 px-3 text-right text-white font-bold">$${t.price.toFixed(2)}</td>
+          <td class="py-3 px-3 text-right font-bold text-white">$${t.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // MARKET SIMULATION & NEXT DAY PRICE TICK
+    // -------------------------------------------------------------------------
+    function advanceMarketDay() {
+      Object.values(state.stocks).forEach(s => {
+        // Random natural drift between -2.5% and +3.0%
+        const delta = (Math.random() * 5.5 - 2.5) / 100;
+        const newPrice = Math.max(10, Math.round((s.currentPrice * (1 + delta)) * 100) / 100);
+        s.percentChange = ((newPrice - s.currentPrice) / s.currentPrice) * 100;
+        s.currentPrice = newPrice;
+        s.prices.push(newPrice);
+        s.dayCount = s.prices.length;
+
+        // Check alerts
+        state.alerts.forEach(a => {
+          if (a.symbol === s.symbol && !a.isTriggered) {
+            if (a.type === 'ABOVE' && newPrice >= a.threshold) {
+              a.isTriggered = true;
+              showToast(`🔔 TARGET REACHED: ${s.symbol} reached $${newPrice.toFixed(2)}!`, 'warning');
+            } else if (a.type === 'BELOW' && newPrice <= a.threshold) {
+              a.isTriggered = true;
+              showToast(`🔔 TARGET REACHED: ${s.symbol} dipped to $${newPrice.toFixed(2)}!`, 'warning');
+            }
+          }
+        });
+      });
+
+      renderAll();
+      if (state.activeTab === 'tab-analytics') {
+        renderAnalyticsTab();
+      }
+      showToast('Market Day Advanced: New closing prices recorded', 'info');
+    }
+
+    // -------------------------------------------------------------------------
+    // QUICK TRADE MODAL
+    // -------------------------------------------------------------------------
+    function openTradeModal(type, symbol) {
+      state.quickTradeType = type;
+      const s = state.stocks[symbol];
+      document.getElementById('modal-trade-symbol').value = s.symbol;
+      document.getElementById('modal-trade-price').value = `$${s.currentPrice.toFixed(2)}`;
+      setModalTradeType(type);
+      updateModalCostPreview();
+      document.getElementById('modal-quick-trade').classList.remove('hidden');
+    }
+
+    function closeQuickTradeModal() {
+      document.getElementById('modal-quick-trade').classList.add('hidden');
+    }
+
+    function setModalTradeType(t) {
+      state.quickTradeType = t;
+      const buyB = document.getElementById('modal-btn-buy');
+      const sellB = document.getElementById('modal-btn-sell');
+      if (t === 'BUY') {
+        buyB.className = 'py-2.5 rounded-xl font-bold bg-emerald-600 text-white transition';
+        sellB.className = 'py-2.5 rounded-xl font-bold bg-slate-800 text-slate-400 hover:text-white transition';
+      } else {
+        sellB.className = 'py-2.5 rounded-xl font-bold bg-rose-600 text-white transition';
+        buyB.className = 'py-2.5 rounded-xl font-bold bg-slate-800 text-slate-400 hover:text-white transition';
+      }
+      updateModalCostPreview();
+    }
+
+    function updateModalCostPreview() {
+      const sym = document.getElementById('modal-trade-symbol').value;
+      const s = state.stocks[sym];
+      if (!s) return;
+      const qty = parseInt(document.getElementById('modal-trade-qty').value) || 0;
+      const total = qty * s.currentPrice;
+      document.getElementById('modal-preview-val').textContent = `$${total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+      document.getElementById('modal-preview-cash').textContent = `$${state.summary.cashBalance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    }
+
+    function confirmQuickTrade() {
+      const sym = document.getElementById('modal-trade-symbol').value;
+      const s = state.stocks[sym];
+      const qty = parseInt(document.getElementById('modal-trade-qty').value);
+      const type = state.quickTradeType;
+
+      if (!qty || qty <= 0) {
+        showToast('Please enter a valid quantity', 'error');
+        return;
+      }
+
+      const total = qty * s.currentPrice;
+      if (type === 'BUY' && state.summary.cashBalance < total) {
+        showToast('Insufficient cash available', 'error');
+        return;
+      }
+      if (type === 'SELL' && s.sharesOwned < qty) {
+        showToast(`Cannot sell ${qty} shares. You only own ${s.sharesOwned} shares of ${s.symbol}`, 'error');
+        return;
+      }
+
+      const trade = {
+        id: Date.now() % 100000,
+        symbol: s.symbol,
+        type: type,
+        quantity: qty,
+        price: s.currentPrice,
+        total: total,
+        timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
+      };
+
+      executeTradeLocally(trade);
+      closeQuickTradeModal();
+      showToast(`Market Order Filled: ${type} ${qty} ${s.symbol}`, 'success');
+    }
+
+    // -------------------------------------------------------------------------
+    // TOAST NOTIFICATIONS
+    // -------------------------------------------------------------------------
+    function showToast(msg, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const colors = {
+        success: 'bg-emerald-950 border-emerald-600 text-emerald-200',
+        error: 'bg-rose-950 border-rose-600 text-rose-200',
+        warning: 'bg-amber-950 border-amber-600 text-amber-200',
+        info: 'bg-emerald-950/80 border-emerald-600 text-emerald-200'
+      };
+
+      toast.className = `p-3 rounded-xl border shadow-xl text-xs flex items-center gap-2 pointer-events-auto transform transition duration-300 translate-y-2 opacity-0 ${colors[type] || colors.info}`;
+      toast.innerHTML = `<span>${msg}</span>`;
+
+      container.appendChild(toast);
+      setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
+      setTimeout(() => {
+        toast.classList.add('opacity-0');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    // -------------------------------------------------------------------------
+    // BOOTSTRAP
+    // -------------------------------------------------------------------------
+    window.addEventListener('DOMContentLoaded', async () => {
+      await syncFromBackend();
+      renderAll();
+    });
+  </script>
+</body>
+</html>
