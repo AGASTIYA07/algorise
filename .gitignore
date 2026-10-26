@@ -15,3 +15,7 @@ bin/
 
 # Logs
 *.log
+
+# Private presentation guide and personal notes
+ALGORISE_PRESENTATION_AND_PROJECT_GUIDE.md
+*PRESENTATION*.md
